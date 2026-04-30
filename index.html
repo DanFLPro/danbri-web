@@ -58,7 +58,7 @@ h2 {
 <input type="number" id="venta" placeholder="Ingrese monto">
 <br>
 
-<input type="text" id="descripcion" placeholder="Descripción de la venta">
+<input type="text" id="descripcion" placeholder="Descripción (opcional)">
 <br>
 
 <button onclick="registrarVenta()">Registrar Venta</button>
@@ -72,16 +72,13 @@ h2 {
 
 <script>
 
-// cargar datos
 let ventas = JSON.parse(localStorage.getItem("ventasDanbri")) || [];
 let siguienteId = parseInt(localStorage.getItem("siguienteIdDanbri")) || 1;
 
-// calcular total
 function calcularTotal() {
     return ventas.reduce((sum, v) => sum + v.monto, 0);
 }
 
-// obtener fecha y hora
 function obtenerFechaHora() {
     let ahora = new Date();
 
@@ -94,7 +91,6 @@ function obtenerFechaHora() {
     return { fecha, hora };
 }
 
-// mostrar datos
 function renderizar() {
     document.getElementById("contador").innerText = ventas.length;
     document.getElementById("total").innerText = calcularTotal();
@@ -120,7 +116,6 @@ function renderizar() {
     localStorage.setItem("siguienteIdDanbri", siguienteId);
 }
 
-// registrar venta
 function registrarVenta() {
     let valor = document.getElementById("venta").value;
     let descripcion = document.getElementById("descripcion").value;
@@ -130,9 +125,9 @@ function registrarVenta() {
         return;
     }
 
+    // 🔥 CAMBIO IMPORTANTE AQUÍ
     if (descripcion.trim() === "") {
-        alert("Ingresa una descripción");
-        return;
+        descripcion = "Venta realizada";
     }
 
     let { fecha, hora } = obtenerFechaHora();
@@ -155,7 +150,6 @@ function registrarVenta() {
     renderizar();
 }
 
-// editar venta
 function editarVenta(id) {
     let venta = ventas.find(v => v.id === id);
 
@@ -173,7 +167,6 @@ function editarVenta(id) {
     renderizar();
 }
 
-// eliminar venta
 function eliminarVenta(id) {
     if (confirm("¿Seguro que deseas eliminar esta venta?")) {
         ventas = ventas.filter(v => v.id !== id);
@@ -181,7 +174,6 @@ function eliminarVenta(id) {
     }
 }
 
-// reiniciar todo
 function reiniciar() {
     if (confirm("¿Seguro que quieres reiniciar todo?")) {
         ventas = [];
@@ -192,7 +184,6 @@ function reiniciar() {
     }
 }
 
-// iniciar
 renderizar();
 
 </script>
