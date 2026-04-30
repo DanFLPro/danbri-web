@@ -68,14 +68,26 @@ h2 {
 <script>
 
 let ventas = JSON.parse(localStorage.getItem("ventasDanbri")) || [];
-let contadorVentas = ventas.length;
 
-// Función para calcular total
+// calcular total
 function calcularTotal() {
     return ventas.reduce((sum, v) => sum + v.monto, 0);
 }
 
-// Mostrar datos
+// obtener fecha y hora
+function obtenerFechaHora() {
+    let ahora = new Date();
+
+    let fecha = ahora.toLocaleDateString("es-PE");
+    let hora = ahora.toLocaleTimeString("es-PE", {
+        hour: "2-digit",
+        minute: "2-digit"
+    });
+
+    return { fecha, hora };
+}
+
+// mostrar datos
 function renderizar() {
     document.getElementById("contador").innerText = ventas.length;
     document.getElementById("total").innerText = calcularTotal();
@@ -87,14 +99,20 @@ function renderizar() {
         lista.innerHTML += `
         <div style="margin:5px; padding:10px; background:#222;">
             🧾 Venta #${v.id} - S/ ${v.monto}
+            <br>
+            📅 ${v.fecha} ⏰ ${v.hora}
+            <br>
             <button onclick="editarVenta(${v.id})">Editar</button>
+            <button onclick="eliminarVenta(${v.id})" style="background:red;color:white;">
+                Eliminar
+            </button>
         </div>`;
     });
 
     localStorage.setItem("ventasDanbri", JSON.stringify(ventas));
 }
 
-// Registrar venta
+// registrar venta
 function registrarVenta() {
     let valor = document.getElementById("venta").value;
 
@@ -103,9 +121,13 @@ function registrarVenta() {
         return;
     }
 
+    let { fecha, hora } = obtenerFechaHora();
+
     let nuevaVenta = {
-        id: ventas.length + 1,
-        monto: parseFloat(valor)
+        id: Date.now(), // ID único real
+        monto: parseFloat(valor),
+        fecha: fecha,
+        hora: hora
     };
 
     ventas.push(nuevaVenta);
@@ -115,11 +137,11 @@ function registrarVenta() {
     renderizar();
 }
 
-// Editar venta
+// editar venta
 function editarVenta(id) {
     let venta = ventas.find(v => v.id === id);
 
-    let nuevoMonto = prompt("Editar monto de la venta #" + id, venta.monto);
+    let nuevoMonto = prompt("Editar monto:", venta.monto);
 
     if (nuevoMonto !== null && nuevoMonto > 0) {
         venta.monto = parseFloat(nuevoMonto);
@@ -127,7 +149,15 @@ function editarVenta(id) {
     }
 }
 
-// Reiniciar todo
+// eliminar venta
+function eliminarVenta(id) {
+    if (confirm("¿Seguro que deseas eliminar esta venta?")) {
+        ventas = ventas.filter(v => v.id !== id);
+        renderizar();
+    }
+}
+
+// reiniciar todo
 function reiniciar() {
     if (confirm("¿Seguro que quieres reiniciar todo?")) {
         ventas = [];
@@ -136,10 +166,10 @@ function reiniciar() {
     }
 }
 
-// Crear contenedor de lista
+// crear contenedor
 document.body.innerHTML += `<div id="listaVentas"></div>`;
 
-// Inicializar
+// iniciar
 renderizar();
 
 </script>
