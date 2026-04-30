@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Danbri Ventas</title>
+
+<style>
+body {
+    font-family: Arial;
+    text-align: center;
+    background: #111;
+    color: white;
+}
+
+input, button {
+    padding: 10px;
+    font-size: 18px;
+}
+
+button {
+    background: orange;
+    border: none;
+    cursor: pointer;
+}
+
+h1 {
+    color: orange;
+}
+</style>
+</head>
+
+<body>
+
+<h1>🔥 Danbri Ventas 🔥</h1>
+
+<input type="number" id="venta" placeholder="Ingrese monto">
+<br><br>
+
+<button onclick="registrarVenta()">Registrar Venta</button>
+
+<h2>Total: S/ <span id="total">0</span></h2>
+
+<script>
+let total = 0;
+
+function registrarVenta() {
+    let valor = document.getElementById("venta").value;
+
+    if (valor === "" || valor <= 0) {
+        alert("Ingresa un monto válido");
+        return;
+    }
+
+    total += parseFloat(valor);
+    document.getElementById("total").innerText = total;
+
+    document.getElementById("venta").value = "";
+}
+</script>
+
+</body>
+</html>
