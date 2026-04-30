@@ -105,7 +105,8 @@ function renderizar() {
             <br>
             📅 ${v.fecha} ⏰ ${v.hora}
             <br>
-            <button onclick="editarVenta(${v.id})">Editar</button>
+            <button onclick="editarVenta(${v.id})">Editar todo</button>
+            <button onclick="editarDescripcion(${v.id})">Editar descripción</button>
             <button onclick="eliminarVenta(${v.id})" style="background:red;color:white;">
                 Eliminar
             </button>
@@ -125,7 +126,6 @@ function registrarVenta() {
         return;
     }
 
-    // 🔥 CAMBIO IMPORTANTE AQUÍ
     if (descripcion.trim() === "") {
         descripcion = "Venta realizada";
     }
@@ -165,6 +165,18 @@ function editarVenta(id) {
     }
 
     renderizar();
+}
+
+// 🔥 NUEVA FUNCIÓN: SOLO EDITAR DESCRIPCIÓN
+function editarDescripcion(id) {
+    let venta = ventas.find(v => v.id === id);
+
+    let nuevaDesc = prompt("Editar SOLO descripción:", venta.descripcion);
+
+    if (nuevaDesc !== null && nuevaDesc.trim() !== "") {
+        venta.descripcion = nuevaDesc;
+        renderizar();
+    }
 }
 
 function eliminarVenta(id) {
