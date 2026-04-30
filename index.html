@@ -7,7 +7,7 @@
 
 <style>
 body {
-    font-family: Arial;
+    font-family: ArialB;
     text-align: center;
     background: #111;
     color: white;
@@ -67,25 +67,32 @@ h2 {
 
 <script>
 
-// Cargar datos guardados
-let total = localStorage.getItem("totalDanbri");
-let contadorVentas = localStorage.getItem("contadorVentas");
+let ventas = JSON.parse(localStorage.getItem("ventasDanbri")) || [];
+let contadorVentas = ventas.length;
 
-if (total === null) {
-    total = 0;
-} else {
-    total = parseFloat(total);
+// Función para calcular total
+function calcularTotal() {
+    return ventas.reduce((sum, v) => sum + v.monto, 0);
 }
 
-if (contadorVentas === null) {
-    contadorVentas = 0;
-} else {
-    contadorVentas = parseInt(contadorVentas);
-}
+// Mostrar datos
+function renderizar() {
+    document.getElementById("contador").innerText = ventas.length;
+    document.getElementById("total").innerText = calcularTotal();
 
-// Mostrar al cargar
-document.getElementById("total").innerText = total;
-document.getElementById("contador").innerText = contadorVentas;
+    let lista = document.getElementById("listaVentas");
+    lista.innerHTML = "";
+
+    ventas.forEach(v => {
+        lista.innerHTML += `
+        <div style="margin:5px; padding:10px; background:#222;">
+            🧾 Venta #${v.id} - S/ ${v.monto}
+            <button onclick="editarVenta(${v.id})">Editar</button>
+        </div>`;
+    });
+
+    localStorage.setItem("ventasDanbri", JSON.stringify(ventas));
+}
 
 // Registrar venta
 function registrarVenta() {
@@ -96,31 +103,44 @@ function registrarVenta() {
         return;
     }
 
-    total += parseFloat(valor);
-    contadorVentas++;
+    let nuevaVenta = {
+        id: ventas.length + 1,
+        monto: parseFloat(valor)
+    };
 
-    localStorage.setItem("totalDanbri", total);
-    localStorage.setItem("contadorVentas", contadorVentas);
-
-    document.getElementById("total").innerText = total;
-    document.getElementById("contador").innerText = contadorVentas;
+    ventas.push(nuevaVenta);
 
     document.getElementById("venta").value = "";
+
+    renderizar();
 }
 
-// Reiniciar
-function reiniciar() {
-    if (confirm("¿Seguro que quieres reiniciar todo?")) {
-        total = 0;
-        contadorVentas = 0;
+// Editar venta
+function editarVenta(id) {
+    let venta = ventas.find(v => v.id === id);
 
-        localStorage.setItem("totalDanbri", total);
-        localStorage.setItem("contadorVentas", contadorVentas);
+    let nuevoMonto = prompt("Editar monto de la venta #" + id, venta.monto);
 
-        document.getElementById("total").innerText = total;
-        document.getElementById("contador").innerText = contadorVentas;
+    if (nuevoMonto !== null && nuevoMonto > 0) {
+        venta.monto = parseFloat(nuevoMonto);
+        renderizar();
     }
 }
+
+// Reiniciar todo
+function reiniciar() {
+    if (confirm("¿Seguro que quieres reiniciar todo?")) {
+        ventas = [];
+        localStorage.removeItem("ventasDanbri");
+        renderizar();
+    }
+}
+
+// Crear contenedor de lista
+document.body.innerHTML += `<div id="listaVentas"></div>`;
+
+// Inicializar
+renderizar();
 
 </script>
 </body>
