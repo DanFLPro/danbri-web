@@ -15,12 +15,18 @@ body {
 input, button {
     padding: 10px;
     font-size: 18px;
+    margin: 5px;
 }
 
 button {
     background: orange;
     border: none;
     cursor: pointer;
+}
+
+.reset {
+    background: red;
+    color: white;
 }
 
 h1 {
@@ -34,15 +40,28 @@ h1 {
 <h1>🔥 Danbri Ventas 🔥</h1>
 
 <input type="number" id="venta" placeholder="Ingrese monto">
-<br><br>
+<br>
 
 <button onclick="registrarVenta()">Registrar Venta</button>
+<button class="reset" onclick="reiniciar()">Reiniciar</button>
 
 <h2>Total: S/ <span id="total">0</span></h2>
 
 <script>
-let total = 0;
 
+// Cargar datos guardados
+let total = localStorage.getItem("totalDanbri");
+
+if (total === null) {
+    total = 0;
+} else {
+    total = parseFloat(total);
+}
+
+// Mostrar al cargar
+document.getElementById("total").innerText = total;
+
+// Registrar venta
 function registrarVenta() {
     let valor = document.getElementById("venta").value;
 
@@ -52,10 +71,23 @@ function registrarVenta() {
     }
 
     total += parseFloat(valor);
-    document.getElementById("total").innerText = total;
 
+    // Guardar en memoria
+    localStorage.setItem("totalDanbri", total);
+
+    document.getElementById("total").innerText = total;
     document.getElementById("venta").value = "";
 }
+
+// Reiniciar
+function reiniciar() {
+    if (confirm("¿Seguro que quieres reiniciar el total?")) {
+        total = 0;
+        localStorage.setItem("totalDanbri", total);
+        document.getElementById("total").innerText = total;
+    }
+}
+
 </script>
 
 </body>
