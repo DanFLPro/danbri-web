@@ -63,10 +63,13 @@ h2 {
 
 <h2>Total: S/ <span id="total">0</span></h2>
 
+<h2>Ventas realizadas: <span id="contador">0</span></h2>
+
 <script>
 
 // Cargar datos guardados
 let total = localStorage.getItem("totalDanbri");
+let contadorVentas = localStorage.getItem("contadorVentas");
 
 if (total === null) {
     total = 0;
@@ -74,8 +77,15 @@ if (total === null) {
     total = parseFloat(total);
 }
 
+if (contadorVentas === null) {
+    contadorVentas = 0;
+} else {
+    contadorVentas = parseInt(contadorVentas);
+}
+
 // Mostrar al cargar
 document.getElementById("total").innerText = total;
+document.getElementById("contador").innerText = contadorVentas;
 
 // Registrar venta
 function registrarVenta() {
@@ -87,24 +97,31 @@ function registrarVenta() {
     }
 
     total += parseFloat(valor);
+    contadorVentas++;
 
-    // Guardar en memoria
     localStorage.setItem("totalDanbri", total);
+    localStorage.setItem("contadorVentas", contadorVentas);
 
     document.getElementById("total").innerText = total;
+    document.getElementById("contador").innerText = contadorVentas;
+
     document.getElementById("venta").value = "";
 }
 
 // Reiniciar
 function reiniciar() {
-    if (confirm("¿Seguro que quieres reiniciar el total?")) {
+    if (confirm("¿Seguro que quieres reiniciar todo?")) {
         total = 0;
+        contadorVentas = 0;
+
         localStorage.setItem("totalDanbri", total);
+        localStorage.setItem("contadorVentas", contadorVentas);
+
         document.getElementById("total").innerText = total;
+        document.getElementById("contador").innerText = contadorVentas;
     }
 }
 
 </script>
-
 </body>
 </html>
