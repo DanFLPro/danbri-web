@@ -70,10 +70,11 @@ h2 {
 
 <div id="listaVentas"></div>
 
-<!-- 🔥 FIREBASE REAL -->
+<!-- 🔥 FIREBASE -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getFirestore, collection, addDoc, onSnapshot } 
+from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyCays-43OS8ExZZAmYPUJFOpTIG2YT_qi8",
@@ -87,36 +88,41 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
+const ventasRef = collection(db, "ventas");
+
+let ventas = [];
+
+// 🔥 GUARDAR EN FIREBASE
 window.guardarEnFirebase = async (venta) => {
     try {
-        await addDoc(collection(db, "ventas"), venta);
-        console.log("🔥 Venta guardada en Firebase");
+        await addDoc(ventasRef, venta);
     } catch (e) {
-        console.error("Firebase error:", e);
+        console.error("Error Firebase:", e);
     }
 };
+
+// 🔥 ESCUCHAR EN TIEMPO REAL
+window.escucharVentas = () => {
+    onSnapshot(ventasRef, (snapshot) => {
+        ventas = [];
+
+        snapshot.forEach(doc => {
+            ventas.push(doc.data());
+        });
+
+        renderizar();
+    });
+};
+
 </script>
 
-<!-- 🔥 SISTEMA LOCAL DANBRI -->
+<!-- 🔥 SISTEMA -->
 <script>
 
-let ventas = JSON.parse(localStorage.getItem("ventasDanbri")) || [];
-let siguienteId = parseInt(localStorage.getItem("siguienteIdDanbri")) || 1;
+let siguienteId = 1;
 
 function calcularTotal() {
     return ventas.reduce((sum, v) => sum + v.monto, 0);
-}
-
-function obtenerFechaHora() {
-    let ahora = new Date();
-
-    return {
-        fecha: ahora.toLocaleDateString("es-PE"),
-        hora: ahora.toLocaleTimeString("es-PE", {
-            hour: "2-digit",
-            minute: "2-digit"
-        })
-    };
 }
 
 function renderizar() {
@@ -134,9 +140,18 @@ function renderizar() {
             📅 ${v.fecha} ⏰ ${v.hora}
         </div>`;
     });
+}
 
-    localStorage.setItem("ventasDanbri", JSON.stringify(ventas));
-    localStorage.setItem("siguienteIdDanbri", siguienteId);
+function obtenerFechaHora() {
+    let ahora = new Date();
+
+    return {
+        fecha: ahora.toLocaleDateString("es-PE"),
+        hora: ahora.toLocaleTimeString("es-PE", {
+            hour: "2-digit",
+            minute: "2-digit"
+        })
+    };
 }
 
 function registrarVenta() {
@@ -155,42 +170,32 @@ function registrarVenta() {
     let { fecha, hora } = obtenerFechaHora();
 
     let nuevaVenta = {
-        id: siguienteId,
+        id: siguienteId++,
         monto: parseFloat(valor),
         descripcion,
         fecha,
         hora
     };
 
-    siguienteId++;
-
-    ventas.push(nuevaVenta);
-
-    // 💾 LOCAL
-    localStorage.setItem("ventasDanbri", JSON.stringify(ventas));
-    localStorage.setItem("siguienteIdDanbri", siguienteId);
-
-    // 🌐 FIREBASE
+    // 🔥 SOLO FIREBASE (ya no localStorage como fuente principal)
     if (typeof window.guardarEnFirebase === "function") {
         window.guardarEnFirebase(nuevaVenta);
     }
 
     document.getElementById("venta").value = "";
     document.getElementById("descripcion").value = "";
-
-    renderizar();
 }
 
 function reiniciar() {
-    if (confirm("¿Seguro que quieres reiniciar todo?")) {
-        ventas = [];
-        siguienteId = 1;
-        localStorage.clear();
-        renderizar();
-    }
+    alert("Para borrar todo en Firebase debes hacerlo desde la consola o lo agregamos luego");
 }
 
-renderizar();
+// 🔥 INICIAR ESCUCHA FIREBASE
+setTimeout(() => {
+    if (typeof window.escucharVentas === "function") {
+        window.escucharVentas();
+    }
+}, 1000);
 
 </script>
 
