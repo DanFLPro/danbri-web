@@ -70,26 +70,23 @@ h2 {
 
 <div id="listaVentas"></div>
 
----
-
-<!-- 🔥 FIREBASE (CORREGIDO) -->
+<!-- 🔥 FIREBASE REAL -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 const firebaseConfig = {
-    apiKey: "TU_API_KEY",
-    authDomain: "TU_AUTH_DOMAIN",
-    projectId: "TU_PROJECT_ID",
-    storageBucket: "TU_STORAGE_BUCKET",
-    messagingSenderId: "TU_SENDER_ID",
-    appId: "TU_APP_ID"
+    apiKey: "AIzaSyCays-43OS8ExZZAmYPUJFOpTIG2YT_qi8",
+    authDomain: "danbri-pos.firebaseapp.com",
+    projectId: "danbri-pos",
+    storageBucket: "danbri-pos.firebasestorage.app",
+    messagingSenderId: "349089645220",
+    appId: "1:349089645220:web:6802d3903b31a84be25c31"
 };
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// 🌐 función global estable
 window.guardarEnFirebase = async (venta) => {
     try {
         await addDoc(collection(db, "ventas"), venta);
@@ -100,9 +97,7 @@ window.guardarEnFirebase = async (venta) => {
 };
 </script>
 
----
-
-<!-- 🔥 SISTEMA DANBRI -->
+<!-- 🔥 SISTEMA LOCAL DANBRI -->
 <script>
 
 let ventas = JSON.parse(localStorage.getItem("ventasDanbri")) || [];
@@ -171,11 +166,11 @@ function registrarVenta() {
 
     ventas.push(nuevaVenta);
 
-    // 💾 localStorage
+    // 💾 LOCAL
     localStorage.setItem("ventasDanbri", JSON.stringify(ventas));
     localStorage.setItem("siguienteIdDanbri", siguienteId);
 
-    // 🌐 Firebase (CORREGIDO)
+    // 🌐 FIREBASE
     if (typeof window.guardarEnFirebase === "function") {
         window.guardarEnFirebase(nuevaVenta);
     }
