@@ -72,12 +72,11 @@ h2 {
 
 ---
 
-<!-- 🔥 FIREBASE (NUBE) -->
+<!-- 🔥 FIREBASE (CORREGIDO) -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-// 🔴 PEGA TU CONFIG AQUÍ
 const firebaseConfig = {
     apiKey: "TU_API_KEY",
     authDomain: "TU_AUTH_DOMAIN",
@@ -90,19 +89,20 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// 🌐 función global para guardar en nube
-window.guardarEnFirebase = async function(venta) {
+// 🌐 función global estable
+window.guardarEnFirebase = async (venta) => {
     try {
         await addDoc(collection(db, "ventas"), venta);
+        console.log("🔥 Venta guardada en Firebase");
     } catch (e) {
-        console.error("Error Firebase:", e);
+        console.error("Firebase error:", e);
     }
 };
 </script>
 
 ---
 
-<!-- 🔥 SISTEMA DANBRI (LOCAL + LOGICA) -->
+<!-- 🔥 SISTEMA DANBRI -->
 <script>
 
 let ventas = JSON.parse(localStorage.getItem("ventasDanbri")) || [];
@@ -117,7 +117,10 @@ function obtenerFechaHora() {
 
     return {
         fecha: ahora.toLocaleDateString("es-PE"),
-        hora: ahora.toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" })
+        hora: ahora.toLocaleTimeString("es-PE", {
+            hour: "2-digit",
+            minute: "2-digit"
+        })
     };
 }
 
@@ -172,9 +175,9 @@ function registrarVenta() {
     localStorage.setItem("ventasDanbri", JSON.stringify(ventas));
     localStorage.setItem("siguienteIdDanbri", siguienteId);
 
-    // 🌐 Firebase
-    if (window.guardarEnFirebase) {
-        guardarEnFirebase(nuevaVenta);
+    // 🌐 Firebase (CORREGIDO)
+    if (typeof window.guardarEnFirebase === "function") {
+        window.guardarEnFirebase(nuevaVenta);
     }
 
     document.getElementById("venta").value = "";
