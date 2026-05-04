@@ -62,7 +62,7 @@ h2 {
 <br>
 
 <button onclick="registrarVenta()">Registrar Venta</button>
-<button class="reset" onclick="reiniciar()">Reiniciar</button>
+<button class="reset" onclick="reiniciarFirebase()">Reiniciar</button>
 
 <h2>Total: S/ <span id="total">0</span></h2>
 <h2>Ventas realizadas: <span id="contador">0</span></h2>
@@ -72,7 +72,7 @@ h2 {
 <!-- 🔥 FIREBASE -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, collection, addDoc, onSnapshot, query, orderBy } 
+import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, getDocs, deleteDoc } 
 from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -87,22 +87,25 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// 🔥 ordenado correctamente
-const ventasRef = query(collection(db, "ventas"), orderBy("timestamp", "desc"));
+const ventasQuery = query(
+    collection(db, "ventas"),
+    orderBy("timestamp", "desc")
+);
 
 window.ventas = [];
 
-// 🔥 GUARDAR EN FIREBASE (con timestamp global)
+// 🔥 GUARDAR
 window.guardarEnFirebase = async (venta) => {
     try {
         await addDoc(collection(db, "ventas"), venta);
     } catch (e) {
-        console.error("Error Firebase:", e);
+        console.error(e);
     }
 };
 
-// 🔥 TIEMPO REAL FIABLE
-onSnapshot(ventasRef, (snapshot) => {
+// 🔥 TIEMPO REAL
+onSnapshot(ventasQuery, (snapshot) => {
+
     const datos = [];
 
     snapshot.forEach(doc => {
@@ -112,6 +115,18 @@ onSnapshot(ventasRef, (snapshot) => {
     window.ventas = datos;
     renderizar();
 });
+
+// 🔥 BORRAR TODO (REINICIO REAL)
+window.reiniciarFirebase = async () => {
+    const snap = await getDocs(collection(db, "ventas"));
+
+    snap.forEach(async (docItem) => {
+        await deleteDoc(docItem.ref);
+    });
+
+    window.ventas = [];
+    renderizar();
+};
 
 </script>
 
@@ -123,7 +138,9 @@ function calcularTotal() {
 }
 
 function renderizar() {
-    let ventas = window.ventas || [];
+
+    // 🔥 ORDEN FINAL DE SEGURIDAD
+    let ventas = (window.ventas || []).sort((a, b) => b.timestamp - a.timestamp);
 
     document.getElementById("contador").innerText = ventas.length;
     document.getElementById("total").innerText = calcularTotal();
@@ -155,6 +172,7 @@ function obtenerFechaHora() {
 }
 
 function registrarVenta() {
+
     let valor = document.getElementById("venta").value;
     let descripcion = document.getElementById("descripcion").value;
 
@@ -181,10 +199,6 @@ function registrarVenta() {
 
     document.getElementById("venta").value = "";
     document.getElementById("descripcion").value = "";
-}
-
-function reiniciar() {
-    alert("Luego agregamos borrado total con admin seguro");
 }
 
 </script>
