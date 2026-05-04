@@ -70,6 +70,39 @@ h2 {
 
 <div id="listaVentas"></div>
 
+---
+
+<!-- 🔥 FIREBASE (NUBE) -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+// 🔴 PEGA TU CONFIG AQUÍ
+const firebaseConfig = {
+    apiKey: "TU_API_KEY",
+    authDomain: "TU_AUTH_DOMAIN",
+    projectId: "TU_PROJECT_ID",
+    storageBucket: "TU_STORAGE_BUCKET",
+    messagingSenderId: "TU_SENDER_ID",
+    appId: "TU_APP_ID"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+// 🌐 función global para guardar en nube
+window.guardarEnFirebase = async function(venta) {
+    try {
+        await addDoc(collection(db, "ventas"), venta);
+    } catch (e) {
+        console.error("Error Firebase:", e);
+    }
+};
+</script>
+
+---
+
+<!-- 🔥 SISTEMA DANBRI (LOCAL + LOGICA) -->
 <script>
 
 let ventas = JSON.parse(localStorage.getItem("ventasDanbri")) || [];
@@ -82,13 +115,10 @@ function calcularTotal() {
 function obtenerFechaHora() {
     let ahora = new Date();
 
-    let fecha = ahora.toLocaleDateString("es-PE");
-    let hora = ahora.toLocaleTimeString("es-PE", {
-        hour: "2-digit",
-        minute: "2-digit"
-    });
-
-    return { fecha, hora };
+    return {
+        fecha: ahora.toLocaleDateString("es-PE"),
+        hora: ahora.toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" })
+    };
 }
 
 function renderizar() {
@@ -104,12 +134,6 @@ function renderizar() {
             🧾 Venta #${v.id} - ${v.descripcion} - S/ ${v.monto}
             <br>
             📅 ${v.fecha} ⏰ ${v.hora}
-            <br>
-            <button onclick="editarVenta(${v.id})">Editar todo</button>
-            <button onclick="editarDescripcion(${v.id})">Editar descripción</button>
-            <button onclick="eliminarVenta(${v.id})" style="background:red;color:white;">
-                Eliminar
-            </button>
         </div>`;
     });
 
@@ -135,14 +159,23 @@ function registrarVenta() {
     let nuevaVenta = {
         id: siguienteId,
         monto: parseFloat(valor),
-        descripcion: descripcion,
-        fecha: fecha,
-        hora: hora
+        descripcion,
+        fecha,
+        hora
     };
 
     siguienteId++;
 
     ventas.push(nuevaVenta);
+
+    // 💾 localStorage
+    localStorage.setItem("ventasDanbri", JSON.stringify(ventas));
+    localStorage.setItem("siguienteIdDanbri", siguienteId);
+
+    // 🌐 Firebase
+    if (window.guardarEnFirebase) {
+        guardarEnFirebase(nuevaVenta);
+    }
 
     document.getElementById("venta").value = "";
     document.getElementById("descripcion").value = "";
@@ -150,48 +183,11 @@ function registrarVenta() {
     renderizar();
 }
 
-function editarVenta(id) {
-    let venta = ventas.find(v => v.id === id);
-
-    let nuevoMonto = prompt("Editar monto:", venta.monto);
-    let nuevaDesc = prompt("Editar descripción:", venta.descripcion);
-
-    if (nuevoMonto !== null && nuevoMonto > 0) {
-        venta.monto = parseFloat(nuevoMonto);
-    }
-
-    if (nuevaDesc !== null && nuevaDesc.trim() !== "") {
-        venta.descripcion = nuevaDesc;
-    }
-
-    renderizar();
-}
-
-// 🔥 NUEVA FUNCIÓN: SOLO EDITAR DESCRIPCIÓN
-function editarDescripcion(id) {
-    let venta = ventas.find(v => v.id === id);
-
-    let nuevaDesc = prompt("Editar SOLO descripción:", venta.descripcion);
-
-    if (nuevaDesc !== null && nuevaDesc.trim() !== "") {
-        venta.descripcion = nuevaDesc;
-        renderizar();
-    }
-}
-
-function eliminarVenta(id) {
-    if (confirm("¿Seguro que deseas eliminar esta venta?")) {
-        ventas = ventas.filter(v => v.id !== id);
-        renderizar();
-    }
-}
-
 function reiniciar() {
     if (confirm("¿Seguro que quieres reiniciar todo?")) {
         ventas = [];
         siguienteId = 1;
-        localStorage.removeItem("ventasDanbri");
-        localStorage.removeItem("siguienteIdDanbri");
+        localStorage.clear();
         renderizar();
     }
 }
