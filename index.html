@@ -94,7 +94,7 @@ const ventasQuery = query(
 
 window.ventas = [];
 
-// 🔥 GUARDAR
+/* 🔥 GUARDAR EN FIREBASE */
 window.guardarEnFirebase = async (venta) => {
     try {
         await addDoc(collection(db, "ventas"), venta);
@@ -103,7 +103,7 @@ window.guardarEnFirebase = async (venta) => {
     }
 };
 
-// 🔥 TIEMPO REAL
+/* 🔥 TIEMPO REAL */
 onSnapshot(ventasQuery, (snapshot) => {
 
     const datos = [];
@@ -116,7 +116,7 @@ onSnapshot(ventasQuery, (snapshot) => {
     renderizar();
 });
 
-// 🔥 BORRAR TODO (REINICIO REAL)
+/* 🔥 REINICIAR FIREBASE */
 window.reiniciarFirebase = async () => {
     const snap = await getDocs(collection(db, "ventas"));
 
@@ -133,13 +133,19 @@ window.reiniciarFirebase = async () => {
 <!-- 🔥 LÓGICA -->
 <script>
 
+let dispositivo = localStorage.getItem("danbri_device");
+
+if (!dispositivo) {
+    dispositivo = prompt("Nombre del dispositivo (PC / Movil 1 / Movil 2):");
+    localStorage.setItem("danbri_device", dispositivo);
+}
+
 function calcularTotal() {
     return (window.ventas || []).reduce((sum, v) => sum + v.monto, 0);
 }
 
 function renderizar() {
 
-    // 🔥 ORDEN FINAL DE SEGURIDAD
     let ventas = (window.ventas || []).sort((a, b) => b.timestamp - a.timestamp);
 
     document.getElementById("contador").innerText = ventas.length;
@@ -151,7 +157,7 @@ function renderizar() {
     ventas.forEach(v => {
         lista.innerHTML += `
         <div style="margin:5px; padding:10px; background:#222;">
-            🧾 ${v.descripcion} - S/ ${v.monto}
+            🧾 ${v.descripcion} - S/ ${v.monto} (${v.dispositivo || "Sin dispositivo"})
             <br>
             📅 ${v.fecha} ⏰ ${v.hora}
         </div>`;
@@ -192,7 +198,8 @@ function registrarVenta() {
         descripcion,
         fecha: tiempo.fecha,
         hora: tiempo.hora,
-        timestamp: tiempo.timestamp
+        timestamp: tiempo.timestamp,
+        dispositivo: dispositivo
     };
 
     window.guardarEnFirebase(nuevaVenta);
