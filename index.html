@@ -69,10 +69,10 @@ h2 {
 
 <div id="listaVentas"></div>
 
-<!-- 🔥 FIREBASE (SOLO ESTE SCRIPT MANEJA TODO) -->
+<!-- 🔥 FIREBASE -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, collection, addDoc, onSnapshot } 
+import { getFirestore, collection, addDoc, onSnapshot, query, orderBy } 
 from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -86,37 +86,37 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
-const ventasRef = collection(db, "ventas");
 
-// 🔥 estado global
+// 🔥 ordenado correctamente
+const ventasRef = query(collection(db, "ventas"), orderBy("timestamp", "desc"));
+
 window.ventas = [];
 
-// 🔥 GUARDAR EN FIREBASE
+// 🔥 GUARDAR EN FIREBASE (con timestamp global)
 window.guardarEnFirebase = async (venta) => {
     try {
-        await addDoc(ventasRef, venta);
+        await addDoc(collection(db, "ventas"), venta);
     } catch (e) {
         console.error("Error Firebase:", e);
     }
 };
 
-// 🔥 ESCUCHA EN TIEMPO REAL (ARREGLADO)
+// 🔥 TIEMPO REAL FIABLE
 onSnapshot(ventasRef, (snapshot) => {
-    window.ventas = [];
+    const datos = [];
 
     snapshot.forEach(doc => {
-        window.ventas.push(doc.data());
+        datos.push(doc.data());
     });
 
+    window.ventas = datos;
     renderizar();
 });
 
 </script>
 
-<!-- 🔥 LÓGICA DEL SISTEMA -->
+<!-- 🔥 LÓGICA -->
 <script>
-
-let siguienteId = 1;
 
 function calcularTotal() {
     return (window.ventas || []).reduce((sum, v) => sum + v.monto, 0);
@@ -134,7 +134,7 @@ function renderizar() {
     ventas.forEach(v => {
         lista.innerHTML += `
         <div style="margin:5px; padding:10px; background:#222;">
-            🧾 Venta #${v.id} - ${v.descripcion} - S/ ${v.monto}
+            🧾 ${v.descripcion} - S/ ${v.monto}
             <br>
             📅 ${v.fecha} ⏰ ${v.hora}
         </div>`;
@@ -149,7 +149,8 @@ function obtenerFechaHora() {
         hora: ahora.toLocaleTimeString("es-PE", {
             hour: "2-digit",
             minute: "2-digit"
-        })
+        }),
+        timestamp: Date.now()
     };
 }
 
@@ -166,17 +167,16 @@ function registrarVenta() {
         descripcion = "Venta realizada";
     }
 
-    let { fecha, hora } = obtenerFechaHora();
+    let tiempo = obtenerFechaHora();
 
     let nuevaVenta = {
-        id: siguienteId++,
         monto: parseFloat(valor),
         descripcion,
-        fecha,
-        hora
+        fecha: tiempo.fecha,
+        hora: tiempo.hora,
+        timestamp: tiempo.timestamp
     };
 
-    // 🔥 SOLO FIREBASE
     window.guardarEnFirebase(nuevaVenta);
 
     document.getElementById("venta").value = "";
@@ -184,7 +184,7 @@ function registrarVenta() {
 }
 
 function reiniciar() {
-    alert("Borrado global en Firebase lo podemos agregar luego (modo admin)");
+    alert("Luego agregamos borrado total con admin seguro");
 }
 
 </script>
