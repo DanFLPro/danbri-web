@@ -37,6 +37,7 @@ button {
     background: orange;
     border: none;
     cursor: pointer;
+    border-radius: 8px;
 }
 
 .reset {
@@ -48,12 +49,12 @@ h2 {
     font-size: 32px;
     margin-top: 20px;
 }
+
 img {
     width: 70%;
     max-width: 300px;
     height: auto;
     text-align: center;
-    
 }
 </style>
 </head>
@@ -80,7 +81,7 @@ img {
 <!-- 🔥 FIREBASE -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, getDocs, deleteDoc } 
+import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, getDocs, deleteDoc, updateDoc, doc } 
 from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -101,6 +102,7 @@ const ventasQuery = query(
 );
 
 window.ventas = [];
+window.ventasConId = [];
 
 /* 🔥 GUARDAR EN FIREBASE */
 window.guardarEnFirebase = async (venta) => {
@@ -111,30 +113,81 @@ window.guardarEnFirebase = async (venta) => {
     }
 };
 
-/* 🔥 TIEMPO REAL */
-onSnapshot(ventasQuery, (snapshot) => {
+/* 🔥 ELIMINAR VENTA */
+window.eliminarVenta = async (id) => {
+    try {
+        await deleteDoc(doc(db, "ventas", id));
+    } catch (e) {
+        console.error(e);
+    }
+};
 
+/* 🔥 EDITAR VENTA */
+window.editarVenta = async (id, nuevoMonto, nuevaDescripcion) => {
+    try {
+        const tiempoActual = obtenerFechaHoraGlobal();
+        await updateDoc(doc(db, "ventas", id), {
+            monto: parseFloat(nuevoMonto),
+            descripcion: nuevaDescripcion,
+            fecha: tiempoActual.fecha,
+            hora: tiempoActual.hora,
+            timestamp: tiempoActual.timestamp
+        });
+    } catch (e) {
+        console.error(e);
+    }
+};
+
+/* 🔥 TIEMPO REAL CON ID */
+onSnapshot(ventasQuery, (snapshot) => {
     const datos = [];
+    const datosConId = [];
 
     snapshot.forEach(doc => {
         datos.push(doc.data());
+        datosConId.push({
+            id: doc.id,
+            ...doc.data()
+        });
     });
 
     window.ventas = datos;
+    window.ventasConId = datosConId;
     renderizar();
 });
 
-/* 🔥 REINICIAR FIREBASE */
+/* 🔥 REINICIAR FIREBASE (CON CONFIRMACIÓN) */
 window.reiniciarFirebase = async () => {
-    const snap = await getDocs(collection(db, "ventas"));
+    const confirmar = confirm("⚠️ ¿Estás seguro de REINICIAR todas las ventas? Esta acción NO se puede deshacer.");
+    
+    if (!confirmar) {
+        return;
+    }
 
-    snap.forEach(async (docItem) => {
+    const snap = await getDocs(collection(db, "ventas"));
+    for (const docItem of snap.docs) {
         await deleteDoc(docItem.ref);
-    });
+    }
 
     window.ventas = [];
+    window.ventasConId = [];
     renderizar();
 };
+
+// Función auxiliar para fecha/hora
+function obtenerFechaHoraGlobal() {
+    let ahora = new Date();
+    return {
+        fecha: ahora.toLocaleDateString("es-PE"),
+        hora: ahora.toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" }),
+        timestamp: Date.now()
+    };
+}
+
+window.obtenerFechaHoraGlobal = obtenerFechaHoraGlobal;
+window.renderizar = renderizar;
+window.eliminarVentaLocal = eliminarVentaLocal;
+window.editarVentaLocal = editarVentaLocal;
 
 </script>
 
@@ -152,45 +205,67 @@ function calcularTotal() {
     return (window.ventas || []).reduce((sum, v) => sum + v.monto, 0);
 }
 
+function editarVentaLocal(id, montoActual, descripcionActual) {
+    let nuevoMonto = prompt("Nuevo monto:", montoActual);
+    if (nuevoMonto === null || nuevoMonto === "" || nuevoMonto <= 0) {
+        alert("Monto inválido");
+        return;
+    }
+    
+    let nuevaDescripcion = prompt("Nueva descripción:", descripcionActual);
+    if (nuevaDescripcion === null || nuevaDescripcion.trim() === "") {
+        nuevaDescripcion = "Venta realizada";
+    }
+    
+    window.editarVenta(id, nuevoMonto, nuevaDescripcion);
+}
+
 function renderizar() {
+    let ventasConId = (window.ventasConId || []).sort((a, b) => b.timestamp - a.timestamp);
 
-    let ventas = (window.ventas || []).sort((a, b) => b.timestamp - a.timestamp);
-
-    document.getElementById("contador").innerText = ventas.length;
+    document.getElementById("contador").innerText = ventasConId.length;
     document.getElementById("total").innerText = calcularTotal();
 
     let lista = document.getElementById("listaVentas");
     lista.innerHTML = "";
 
-    ventas.forEach(v => {
+    ventasConId.forEach(v => {
+        // Escapar comillas simples en la descripción para evitar errores
+        let descripcionEscapada = v.descripcion.replace(/'/g, "\\'");
+        
         lista.innerHTML += `
-        <div style="margin:5px; padding:10px; background:#222;">
-            🧾 ${v.descripcion} - S/ ${v.monto} (${v.dispositivo || "Sin dispositivo"})
-            <br>
-            📅 ${v.fecha} ⏰ ${v.hora}
+        <div style="margin:5px; padding:10px; background:#222; border-radius:8px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap;">
+                <div style="text-align:left;">
+                    🧾 <strong>${v.descripcion}</strong> - S/ ${v.monto} (${v.dispositivo || "Sin dispositivo"})
+                    <br>
+                    📅 ${v.fecha} ⏰ ${v.hora}
+                </div>
+                <div style="display:flex; gap:10px; margin-top:5px;">
+                    <button onclick="editarVentaLocal('${v.id}', ${v.monto}, '${descripcionEscapada}')" style="background:#ff9800; padding:5px 12px; font-size:14px; width:auto;">
+                        ✏️ Editar
+                    </button>
+                    <button onclick="eliminarVentaLocal('${v.id}')" style="background:#f44336; padding:5px 12px; font-size:14px; width:auto;">
+                        🗑️ Eliminar
+                    </button>
+                </div>
+            </div>
         </div>`;
     });
 }
 
-function obtenerFechaHora() {
-    let ahora = new Date();
-
-    return {
-        fecha: ahora.toLocaleDateString("es-PE"),
-        hora: ahora.toLocaleTimeString("es-PE", {
-            hour: "2-digit",
-            minute: "2-digit"
-        }),
-        timestamp: Date.now()
-    };
+function eliminarVentaLocal(id) {
+    const confirmar = confirm("⚠️ ¿Eliminar esta venta?");
+    if (confirmar) {
+        window.eliminarVenta(id);
+    }
 }
 
 function registrarVenta() {
-
     let valor = document.getElementById("venta").value;
     let descripcion = document.getElementById("descripcion").value;
 
-    if (valor === "" || valor <= 0) {
+    if (valor === "" || parseFloat(valor) <= 0) {
         alert("Ingresa un monto válido");
         return;
     }
@@ -199,11 +274,11 @@ function registrarVenta() {
         descripcion = "Venta realizada";
     }
 
-    let tiempo = obtenerFechaHora();
+    let tiempo = window.obtenerFechaHoraGlobal();
 
     let nuevaVenta = {
         monto: parseFloat(valor),
-        descripcion,
+        descripcion: descripcion,
         fecha: tiempo.fecha,
         hora: tiempo.hora,
         timestamp: tiempo.timestamp,
