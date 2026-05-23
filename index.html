@@ -26,6 +26,8 @@ input {
     width: 80%;
     max-width: 300px;
     margin: 10px 0;
+    border-radius: 8px;
+    border: none;
 }
 
 button {
@@ -38,6 +40,7 @@ button {
     border: none;
     cursor: pointer;
     border-radius: 8px;
+    font-weight: bold;
 }
 
 .reset {
@@ -54,34 +57,103 @@ img {
     width: 70%;
     max-width: 300px;
     height: auto;
-    text-align: center;
+}
+
+/* Pantalla de login */
+.login-container {
+    background: #1a1a1a;
+    padding: 40px;
+    border-radius: 20px;
+    max-width: 400px;
+    margin: 100px auto;
+    box-shadow: 0 0 20px rgba(255,165,0,0.3);
+}
+
+.login-container h2 {
+    margin-top: 0;
+}
+
+.error {
+    color: #ff6b6b;
+    margin-top: 10px;
+}
+
+/* Panel de ventas (oculto al inicio) */
+.ventas-panel {
+    display: none;
+}
+
+/* Badge de usuario */
+.user-badge {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: rgba(241, 80, 5, 0.966);
+    padding: 10px 15px;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    z-index: 100;
+}
+
+.user-badge:hover {
+    background: rgba(241, 80, 5, 0.8);
+}
+
+/* Botones de acción */
+.action-buttons {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
 }
 </style>
 </head>
 
 <body>
-<img src="imag/Logo Danbri.png"> <br>
 
-<h1>🔥DANBRI Ventas🔥</h1>
+<!-- Pantalla de Login -->
+<div id="loginScreen" class="login-container">
+    <img src="imag/Logo Danbri.png" width="150">
+    <h2>🔐 DANBRI POS</h2>
+    <input type="text" id="loginUsuario" placeholder="Usuario">
+    <br>
+    <input type="password" id="loginPassword" placeholder="Contraseña">
+    <br>
+    <button onclick="iniciarSesion()">Ingresar</button>
+    <div id="loginError" class="error"></div>
+</div>
 
-<input type="number" id="venta" placeholder="Ingrese monto">
-<br>
+<!-- Panel Principal de Ventas (oculto al inicio) -->
+<div id="ventasPanel" class="ventas-panel">
+    <div class="user-badge" onclick="cerrarSesion()">
+        👤 <span id="userNameDisplay"></span> | 🚪 Salir
+    </div>
 
-<input type="text" id="descripcion" placeholder="Descripción (opcional)">
-<br>
+    <img src="imag/Logo Danbri.png"> <br>
+    <h1>🔥 DANBRI Ventas 🔥</h1>
 
-<button onclick="registrarVenta()">Registrar Venta</button>
-<button class="reset" onclick="reiniciarFirebase()">Reiniciar</button>
+    <div class="action-buttons">
+        <input type="number" id="venta" placeholder="Ingrese monto">
+        <input type="text" id="descripcion" placeholder="Descripción (opcional)">
+        <button onclick="registrarVenta()">Registrar Venta</button>
+        
+        <div id="adminButtons" style="display:none;">
+            <button class="reset" onclick="reiniciarFirebase()">Reiniciar TODAS las ventas</button>
+        </div>
+    </div>
 
-<h2>Total: S/ <span id="total">0</span></h2>
-<h2>Ventas realizadas: <span id="contador">0</span></h2>
+    <h2>Total: S/ <span id="total">0</span></h2>
+    <h2>Ventas realizadas: <span id="contador">0</span></h2>
 
-<div id="listaVentas"></div>
+    <div id="listaVentas"></div>
+</div>
 
 <!-- 🔥 FIREBASE -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, getDocs, deleteDoc, updateDoc, doc } 
+import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, getDocs, deleteDoc, updateDoc, doc, where } 
 from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -96,13 +168,58 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-const ventasQuery = query(
-    collection(db, "ventas"),
-    orderBy("timestamp", "desc")
-);
+window.db = db;
+
+let usuarioActual = null;
+let rolActual = null;
+
+/* 🔥 USUARIOS PREDEFINIDOS */
+const usuarios = {
+    admin: { password: "admin123", rol: "admin", nombre: "Administrador" },
+    daniel: { password: "1234", rol: "vendedor", nombre: "Daniel" },
+    carlos: { password: "1234", rol: "vendedor", nombre: "Carlos" },
+    maria: { password: "1234", rol: "vendedor", nombre: "María" }
+};
 
 window.ventas = [];
 window.ventasConId = [];
+
+/* 🔥 FUNCIÓN PARA CARGAR VENTAS SEGÚN ROL */
+function cargarVentas() {
+    let q;
+    
+    if (rolActual === "admin") {
+        // Admin ve TODAS las ventas
+        q = query(collection(db, "ventas"), orderBy("timestamp", "desc"));
+    } else {
+        // Vendedor ve solo SUS ventas
+        q = query(
+            collection(db, "ventas"), 
+            where("vendedor", "==", usuarioActual),
+            orderBy("timestamp", "desc")
+        );
+    }
+    
+    return onSnapshot(q, (snapshot) => {
+        const datos = [];
+        const datosConId = [];
+
+        snapshot.forEach(doc => {
+            datos.push(doc.data());
+            datosConId.push({
+                id: doc.id,
+                ...doc.data()
+            });
+        });
+
+        window.ventas = datos;
+        window.ventasConId = datosConId;
+        
+        if (typeof renderizar === 'function') {
+            renderizar();
+        }
+    });
+}
 
 /* 🔥 GUARDAR EN FIREBASE */
 window.guardarEnFirebase = async (venta) => {
@@ -138,27 +255,14 @@ window.editarVenta = async (id, nuevoMonto, nuevaDescripcion) => {
     }
 };
 
-/* 🔥 TIEMPO REAL CON ID */
-onSnapshot(ventasQuery, (snapshot) => {
-    const datos = [];
-    const datosConId = [];
-
-    snapshot.forEach(doc => {
-        datos.push(doc.data());
-        datosConId.push({
-            id: doc.id,
-            ...doc.data()
-        });
-    });
-
-    window.ventas = datos;
-    window.ventasConId = datosConId;
-    renderizar();
-});
-
-/* 🔥 REINICIAR FIREBASE (CON CONFIRMACIÓN) */
+/* 🔥 REINICIAR FIREBASE (SOLO ADMIN) */
 window.reiniciarFirebase = async () => {
-    const confirmar = confirm("⚠️ ¿Estás seguro de REINICIAR todas las ventas? Esta acción NO se puede deshacer.");
+    if (rolActual !== "admin") {
+        alert("Solo el administrador puede reiniciar todas las ventas.");
+        return;
+    }
+    
+    const confirmar = confirm("⚠️ ¿Estás seguro de REINICIAR TODAS las ventas? Esta acción NO se puede deshacer.");
     
     if (!confirmar) {
         return;
@@ -171,10 +275,11 @@ window.reiniciarFirebase = async () => {
 
     window.ventas = [];
     window.ventasConId = [];
-    renderizar();
+    if (typeof renderizar === 'function') {
+        renderizar();
+    }
 };
 
-// Función auxiliar para fecha/hora
 function obtenerFechaHoraGlobal() {
     let ahora = new Date();
     return {
@@ -185,20 +290,57 @@ function obtenerFechaHoraGlobal() {
 }
 
 window.obtenerFechaHoraGlobal = obtenerFechaHoraGlobal;
-window.renderizar = renderizar;
-window.eliminarVentaLocal = eliminarVentaLocal;
-window.editarVentaLocal = editarVentaLocal;
+window.iniciarSesionGlobal = (usuario, rol, nombre) => {
+    usuarioActual = usuario;
+    rolActual = rol;
+    
+    // Mostrar panel de ventas
+    document.getElementById("loginScreen").style.display = "none";
+    document.getElementById("ventasPanel").style.display = "block";
+    document.getElementById("userNameDisplay").innerText = nombre;
+    
+    // Mostrar botones de admin si corresponde
+    if (rolActual === "admin") {
+        document.getElementById("adminButtons").style.display = "block";
+    } else {
+        document.getElementById("adminButtons").style.display = "none";
+    }
+    
+    // Iniciar carga de ventas
+    cargarVentas();
+};
+
+window.cerrarSesionGlobal = () => {
+    usuarioActual = null;
+    rolActual = null;
+    document.getElementById("loginScreen").style.display = "block";
+    document.getElementById("ventasPanel").style.display = "none";
+    document.getElementById("loginUsuario").value = "";
+    document.getElementById("loginPassword").value = "";
+};
 
 </script>
 
-<!-- 🔥 LÓGICA -->
+<!-- 🔥 LÓGICA PRINCIPAL -->
 <script>
 
-let dispositivo = localStorage.getItem("danbri_device");
+function iniciarSesion() {
+    const usuario = document.getElementById("loginUsuario").value.trim().toLowerCase();
+    const password = document.getElementById("loginPassword").value;
+    const errorDiv = document.getElementById("loginError");
+    
+    // Verificar credenciales
+    if (window.usuarios && window.usuarios[usuario] && window.usuarios[usuario].password === password) {
+        const userData = window.usuarios[usuario];
+        window.iniciarSesionGlobal(usuario, userData.rol, userData.nombre);
+        errorDiv.innerText = "";
+    } else {
+        errorDiv.innerText = "❌ Usuario o contraseña incorrectos";
+    }
+}
 
-if (!dispositivo) {
-    dispositivo = prompt("Nombre del dispositivo (PC / Movil 1 / Movil 2):");
-    localStorage.setItem("danbri_device", dispositivo);
+function cerrarSesion() {
+    window.cerrarSesionGlobal();
 }
 
 function calcularTotal() {
@@ -222,30 +364,31 @@ function editarVentaLocal(id, montoActual, descripcionActual) {
 
 function renderizar() {
     let ventasConId = (window.ventasConId || []).sort((a, b) => b.timestamp - a.timestamp);
+    let usuarioMostrar = window.rolActual === "admin" ? "TODOS" : window.usuarioActual;
 
     document.getElementById("contador").innerText = ventasConId.length;
     document.getElementById("total").innerText = calcularTotal();
 
     let lista = document.getElementById("listaVentas");
-    lista.innerHTML = "";
+    lista.innerHTML = `<div style="margin-bottom:10px;">📋 Mostrando ventas de: <strong>${usuarioMostrar}</strong></div>`;
 
     ventasConId.forEach(v => {
-        // Escapar comillas simples en la descripción para evitar errores
-        let descripcionEscapada = v.descripcion.replace(/'/g, "\\'");
+        let descripcionEscapada = (v.descripcion || "").replace(/'/g, "\\'");
+        let vendedorInfo = window.rolActual === "admin" ? `<br>👤 Vendedor: ${v.vendedor || "desconocido"}` : "";
         
         lista.innerHTML += `
         <div style="margin:5px; padding:10px; background:#222; border-radius:8px;">
             <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap;">
                 <div style="text-align:left;">
-                    🧾 <strong>${v.descripcion}</strong> - S/ ${v.monto} (${v.dispositivo || "Sin dispositivo"})
+                    🧾 <strong>${v.descripcion || "Venta"}</strong> - S/ ${v.monto}${vendedorInfo}
                     <br>
                     📅 ${v.fecha} ⏰ ${v.hora}
                 </div>
                 <div style="display:flex; gap:10px; margin-top:5px;">
-                    <button onclick="editarVentaLocal('${v.id}', ${v.monto}, '${descripcionEscapada}')" style="background:#ff9800; padding:5px 12px; font-size:14px; width:auto;">
+                    <button onclick="editarVentaLocal('${v.id}', ${v.monto}, '${descripcionEscapada}')" style="background:#ff9800; padding:5px 12px; font-size:14px; width:auto; border-radius:5px;">
                         ✏️ Editar
                     </button>
-                    <button onclick="eliminarVentaLocal('${v.id}')" style="background:#f44336; padding:5px 12px; font-size:14px; width:auto;">
+                    <button onclick="eliminarVentaLocal('${v.id}')" style="background:#f44336; padding:5px 12px; font-size:14px; width:auto; border-radius:5px;">
                         🗑️ Eliminar
                     </button>
                 </div>
@@ -282,7 +425,7 @@ function registrarVenta() {
         fecha: tiempo.fecha,
         hora: tiempo.hora,
         timestamp: tiempo.timestamp,
-        dispositivo: dispositivo
+        vendedor: window.usuarioActual  // 🔥 Guardamos quién registró la venta
     };
 
     window.guardarEnFirebase(nuevaVenta);
@@ -290,6 +433,21 @@ function registrarVenta() {
     document.getElementById("venta").value = "";
     document.getElementById("descripcion").value = "";
 }
+
+// Exponer funciones globalmente
+window.editarVentaLocal = editarVentaLocal;
+window.eliminarVentaLocal = eliminarVentaLocal;
+window.registrarVenta = registrarVenta;
+window.renderizar = renderizar;
+window.calcularTotal = calcularTotal;
+window.usuarios = {
+    admin: { password: "admin123", rol: "admin", nombre: "Administrador" },
+    daniel: { password: "1234", rol: "vendedor", nombre: "Daniel" },
+    carlos: { password: "1234", rol: "vendedor", nombre: "Carlos" },
+    maria: { password: "1234", rol: "vendedor", nombre: "María" }
+};
+window.usuarioActual = null;
+window.rolActual = null;
 
 </script>
 
