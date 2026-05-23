@@ -176,23 +176,40 @@ let rolActual = null;
 /* 🔥 USUARIOS PREDEFINIDOS */
 const usuarios = {
     admin: { password: "admin123", rol: "admin", nombre: "Administrador" },
-    daniel: { password: "1234", rol: "vendedor", nombre: "Daniel" },
+    daniel: { password: "12345", rol: "vendedor", nombre: "Tomasita" },
     carlos: { password: "1234", rol: "vendedor", nombre: "Carlos" },
     maria: { password: "1234", rol: "vendedor", nombre: "María" }
 };
 
+window.usuarios = usuarios;
 window.ventas = [];
 window.ventasConId = [];
+
+/* 🔥 VERIFICAR SESIÓN GUARDADA AL INICIAR */
+function verificarSesionGuardada() {
+    const usuarioGuardado = localStorage.getItem("danbri_usuario");
+    const passwordGuardada = localStorage.getItem("danbri_password");
+    
+    if (usuarioGuardado && passwordGuardada) {
+        if (window.usuarios[usuarioGuardado] && window.usuarios[usuarioGuardado].password === passwordGuardada) {
+            const userData = window.usuarios[usuarioGuardado];
+            iniciarSesionGlobal(usuarioGuardado, userData.rol, userData.nombre);
+            return true;
+        } else {
+            localStorage.removeItem("danbri_usuario");
+            localStorage.removeItem("danbri_password");
+        }
+    }
+    return false;
+}
 
 /* 🔥 FUNCIÓN PARA CARGAR VENTAS SEGÚN ROL */
 function cargarVentas() {
     let q;
     
     if (rolActual === "admin") {
-        // Admin ve TODAS las ventas
         q = query(collection(db, "ventas"), orderBy("timestamp", "desc"));
     } else {
-        // Vendedor ve solo SUS ventas
         q = query(
             collection(db, "ventas"), 
             where("vendedor", "==", usuarioActual),
@@ -200,7 +217,11 @@ function cargarVentas() {
         );
     }
     
-    return onSnapshot(q, (snapshot) => {
+    if (window.unsubscribeVentas) {
+        window.unsubscribeVentas();
+    }
+    
+    window.unsubscribeVentas = onSnapshot(q, (snapshot) => {
         const datos = [];
         const datosConId = [];
 
@@ -218,6 +239,8 @@ function cargarVentas() {
         if (typeof renderizar === 'function') {
             renderizar();
         }
+    }, (error) => {
+        console.error("Error en onSnapshot:", error);
     });
 }
 
@@ -227,6 +250,7 @@ window.guardarEnFirebase = async (venta) => {
         await addDoc(collection(db, "ventas"), venta);
     } catch (e) {
         console.error(e);
+        alert("Error al guardar: " + e.message);
     }
 };
 
@@ -236,6 +260,7 @@ window.eliminarVenta = async (id) => {
         await deleteDoc(doc(db, "ventas", id));
     } catch (e) {
         console.error(e);
+        alert("Error al eliminar: " + e.message);
     }
 };
 
@@ -252,6 +277,7 @@ window.editarVenta = async (id, nuevoMonto, nuevaDescripcion) => {
         });
     } catch (e) {
         console.error(e);
+        alert("Error al editar: " + e.message);
     }
 };
 
@@ -290,34 +316,50 @@ function obtenerFechaHoraGlobal() {
 }
 
 window.obtenerFechaHoraGlobal = obtenerFechaHoraGlobal;
-window.iniciarSesionGlobal = (usuario, rol, nombre) => {
+
+function iniciarSesionGlobal(usuario, rol, nombre) {
     usuarioActual = usuario;
     rolActual = rol;
     
-    // Mostrar panel de ventas
+    localStorage.setItem("danbri_usuario", usuario);
+    localStorage.setItem("danbri_password", window.usuarios[usuario].password);
+    
     document.getElementById("loginScreen").style.display = "none";
     document.getElementById("ventasPanel").style.display = "block";
     document.getElementById("userNameDisplay").innerText = nombre;
     
-    // Mostrar botones de admin si corresponde
     if (rolActual === "admin") {
         document.getElementById("adminButtons").style.display = "block";
     } else {
         document.getElementById("adminButtons").style.display = "none";
     }
     
-    // Iniciar carga de ventas
     cargarVentas();
-};
+}
 
-window.cerrarSesionGlobal = () => {
+function cerrarSesionGlobal() {
+    localStorage.removeItem("danbri_usuario");
+    localStorage.removeItem("danbri_password");
+    
+    if (window.unsubscribeVentas) {
+        window.unsubscribeVentas();
+    }
     usuarioActual = null;
     rolActual = null;
     document.getElementById("loginScreen").style.display = "block";
     document.getElementById("ventasPanel").style.display = "none";
     document.getElementById("loginUsuario").value = "";
     document.getElementById("loginPassword").value = "";
-};
+    window.ventas = [];
+    window.ventasConId = [];
+}
+
+window.iniciarSesionGlobal = iniciarSesionGlobal;
+window.cerrarSesionGlobal = cerrarSesionGlobal;
+window.getUsuarioActual = () => usuarioActual;
+window.getRolActual = () => rolActual;
+
+verificarSesionGuardada();
 
 </script>
 
@@ -329,7 +371,6 @@ function iniciarSesion() {
     const password = document.getElementById("loginPassword").value;
     const errorDiv = document.getElementById("loginError");
     
-    // Verificar credenciales
     if (window.usuarios && window.usuarios[usuario] && window.usuarios[usuario].password === password) {
         const userData = window.usuarios[usuario];
         window.iniciarSesionGlobal(usuario, userData.rol, userData.nombre);
@@ -344,7 +385,7 @@ function cerrarSesion() {
 }
 
 function calcularTotal() {
-    return (window.ventas || []).reduce((sum, v) => sum + v.monto, 0);
+    return (window.ventas || []).reduce((sum, v) => sum + (v.monto || 0), 0);
 }
 
 function editarVentaLocal(id, montoActual, descripcionActual) {
@@ -363,18 +404,25 @@ function editarVentaLocal(id, montoActual, descripcionActual) {
 }
 
 function renderizar() {
-    let ventasConId = (window.ventasConId || []).sort((a, b) => b.timestamp - a.timestamp);
-    let usuarioMostrar = window.rolActual === "admin" ? "TODOS" : window.usuarioActual;
+    let ventasConId = (window.ventasConId || []).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+    let usuarioMostrar = window.getRolActual() === "admin" ? "TODOS los vendedores" : `VENDEDOR: ${window.getUsuarioActual()}`;
 
     document.getElementById("contador").innerText = ventasConId.length;
     document.getElementById("total").innerText = calcularTotal();
 
     let lista = document.getElementById("listaVentas");
-    lista.innerHTML = `<div style="margin-bottom:10px;">📋 Mostrando ventas de: <strong>${usuarioMostrar}</strong></div>`;
+    lista.innerHTML = `<div style="margin-bottom:15px; padding:10px; background:#1a1a1a; border-radius:8px;">
+        📋 Mostrando ventas de: <strong style="color:orange;">${usuarioMostrar}</strong>
+    </div>`;
+
+    if (ventasConId.length === 0) {
+        lista.innerHTML += `<div style="padding:20px; color:#888;">No hay ventas para mostrar</div>`;
+        return;
+    }
 
     ventasConId.forEach(v => {
-        let descripcionEscapada = (v.descripcion || "").replace(/'/g, "\\'");
-        let vendedorInfo = window.rolActual === "admin" ? `<br>👤 Vendedor: ${v.vendedor || "desconocido"}` : "";
+        let descripcionEscapada = (v.descripcion || "Venta").replace(/'/g, "\\'");
+        let vendedorInfo = window.getRolActual() === "admin" ? `<br>👤 <span style="color:orange;">Vendedor: ${v.vendedor || "desconocido"}</span>` : "";
         
         lista.innerHTML += `
         <div style="margin:5px; padding:10px; background:#222; border-radius:8px;">
@@ -382,7 +430,7 @@ function renderizar() {
                 <div style="text-align:left;">
                     🧾 <strong>${v.descripcion || "Venta"}</strong> - S/ ${v.monto}${vendedorInfo}
                     <br>
-                    📅 ${v.fecha} ⏰ ${v.hora}
+                    📅 ${v.fecha || "fecha"} ⏰ ${v.hora || "hora"}
                 </div>
                 <div style="display:flex; gap:10px; margin-top:5px;">
                     <button onclick="editarVentaLocal('${v.id}', ${v.monto}, '${descripcionEscapada}')" style="background:#ff9800; padding:5px 12px; font-size:14px; width:auto; border-radius:5px;">
@@ -407,6 +455,13 @@ function eliminarVentaLocal(id) {
 function registrarVenta() {
     let valor = document.getElementById("venta").value;
     let descripcion = document.getElementById("descripcion").value;
+    
+    let usuarioVendedor = window.getUsuarioActual();
+    
+    if (!usuarioVendedor) {
+        alert("Error: No se detectó usuario. Por favor, cierra sesión y vuelve a entrar.");
+        return;
+    }
 
     if (valor === "" || parseFloat(valor) <= 0) {
         alert("Ingresa un monto válido");
@@ -425,7 +480,7 @@ function registrarVenta() {
         fecha: tiempo.fecha,
         hora: tiempo.hora,
         timestamp: tiempo.timestamp,
-        vendedor: window.usuarioActual  // 🔥 Guardamos quién registró la venta
+        vendedor: usuarioVendedor
     };
 
     window.guardarEnFirebase(nuevaVenta);
@@ -434,20 +489,11 @@ function registrarVenta() {
     document.getElementById("descripcion").value = "";
 }
 
-// Exponer funciones globalmente
 window.editarVentaLocal = editarVentaLocal;
 window.eliminarVentaLocal = eliminarVentaLocal;
 window.registrarVenta = registrarVenta;
 window.renderizar = renderizar;
 window.calcularTotal = calcularTotal;
-window.usuarios = {
-    admin: { password: "admin123", rol: "admin", nombre: "Administrador" },
-    daniel: { password: "1234", rol: "vendedor", nombre: "Daniel" },
-    carlos: { password: "1234", rol: "vendedor", nombre: "Carlos" },
-    maria: { password: "1234", rol: "vendedor", nombre: "María" }
-};
-window.usuarioActual = null;
-window.rolActual = null;
 
 </script>
 
