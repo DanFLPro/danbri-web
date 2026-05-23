@@ -170,7 +170,7 @@ let ventasConId = [];
 // ==================== INICIALIZAR FIREBASE ====================
 async function iniciarFirebase() {
     const { initializeApp } = await import("https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js");
-    const { getFirestore, collection, addDoc, onSnapshot, query, orderBy, getDocs, deleteDoc, updateDoc, doc, where } 
+    const { getFirestore, collection, addDoc, onSnapshot, query, orderBy, getDocs, deleteDoc, updateDoc, doc } 
         = await import("https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js");
     
     const firebaseConfig = {
@@ -195,7 +195,6 @@ async function iniciarFirebase() {
     window.deleteDoc = deleteDoc;
     window.updateDoc = updateDoc;
     window.doc = doc;
-    window.where = where;
 }
 
 // ==================== FUNCIONES PRINCIPALES ====================
@@ -259,24 +258,24 @@ function cargarVentas() {
         unsubscribeVentas();
     }
     
-    let q;
-    if (rolActual === "admin") {
-        q = window.query(window.collection(window.db, "ventas"), window.orderBy("timestamp", "desc"));
-    } else {
-        q = window.query(
-            window.collection(window.db, "ventas"),
-            window.where("vendedor", "==", usuarioActual),
-            window.orderBy("timestamp", "desc")
-        );
-    }
+    // Usar una consulta simple (sin where por ahora para evitar índices)
+    // Filtramos manualmente en el frontend según el rol
+    const q = window.query(window.collection(window.db, "ventas"), window.orderBy("timestamp", "desc"));
     
     unsubscribeVentas = window.onSnapshot(q, (snapshot) => {
         const datos = [];
         const datosConId = [];
         
         snapshot.forEach(docSnap => {
-            datos.push(docSnap.data());
-            datosConId.push({ id: docSnap.id, ...docSnap.data() });
+            const data = docSnap.data();
+            // Filtrar según el rol
+            if (rolActual === "admin") {
+                datos.push(data);
+                datosConId.push({ id: docSnap.id, ...data });
+            } else if (rolActual === "vendedor" && data.vendedor === usuarioActual) {
+                datos.push(data);
+                datosConId.push({ id: docSnap.id, ...data });
+            }
         });
         
         ventas = datos;
@@ -319,6 +318,7 @@ async function registrarVenta() {
         await window.addDoc(window.collection(window.db, "ventas"), nuevaVenta);
         document.getElementById("venta").value = "";
         document.getElementById("descripcion").value = "";
+        alert("✅ Venta registrada correctamente");
     } catch (e) {
         console.error(e);
         alert("Error al guardar: " + e.message);
@@ -326,6 +326,13 @@ async function registrarVenta() {
 }
 
 async function editarVenta(id, montoActual, descripcionActual) {
+    // Verificar que la venta pertenezca al vendedor actual (solo por seguridad)
+    const venta = ventasConId.find(v => v.id === id);
+    if (rolActual !== "admin" && (!venta || venta.vendedor !== usuarioActual)) {
+        alert("No puedes editar esta venta");
+        return;
+    }
+    
     let nuevoMonto = prompt("Nuevo monto:", montoActual);
     if (nuevoMonto === null || nuevoMonto === "" || nuevoMonto <= 0) {
         alert("Monto inválido");
@@ -347,6 +354,7 @@ async function editarVenta(id, montoActual, descripcionActual) {
             hora: tiempo.hora,
             timestamp: tiempo.timestamp
         });
+        alert("✅ Venta editada correctamente");
     } catch (e) {
         console.error(e);
         alert("Error al editar: " + e.message);
@@ -354,10 +362,18 @@ async function editarVenta(id, montoActual, descripcionActual) {
 }
 
 async function eliminarVenta(id) {
+    // Verificar que la venta pertenezca al vendedor actual
+    const venta = ventasConId.find(v => v.id === id);
+    if (rolActual !== "admin" && (!venta || venta.vendedor !== usuarioActual)) {
+        alert("No puedes eliminar esta venta");
+        return;
+    }
+    
     const confirmar = confirm("⚠️ ¿Eliminar esta venta?");
     if (confirmar) {
         try {
             await window.deleteDoc(window.doc(window.db, "ventas", id));
+            alert("✅ Venta eliminada correctamente");
         } catch (e) {
             console.error(e);
             alert("Error al eliminar: " + e.message);
