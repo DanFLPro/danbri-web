@@ -459,7 +459,7 @@ async function eliminarVenta(id) {
     }
 }
 
-// ==================== CERRAR DÍA CORREGIDO ====================
+// ==================== CERRAR DÍA CON ÚLTIMA FECHA REGISTRADA ====================
 async function cerrarDia() {
     if (rolActual !== "admin") {
         alert("Solo el administrador puede cerrar el día.");
@@ -471,62 +471,56 @@ async function cerrarDia() {
         return;
     }
     
-    // 🔍 DIAGNÓSTICO: Mostrar las fechas
-    let fechasVentas = ventasConId.map(v => v.fecha || "sin fecha").join(", ");
+    // Obtener todas las fechas distintas de las ventas
+    let fechasUnicas = [...new Set(ventasConId.map(v => v.fecha || "sin fecha"))];
+    fechasUnicas = fechasUnicas.filter(f => f !== "sin fecha").sort();
     
-    const confirmar = confirm(`⚠️ ¿Cerrar el día?\n\n📅 Fechas de ventas encontradas:\n${fechasVentas}\n\nSe guardará el resumen y se eliminarán las ventas del día de HOY.`);
+    if (fechasUnicas.length === 0) {
+        alert("No hay ventas con fecha válida para cerrar.");
+        return;
+    }
+    
+    // La fecha más reciente es la última de la lista (ordenada)
+    const fechaCerrar = fechasUnicas[fechasUnicas.length - 1];
+    
+    // Calcular total de las ventas de esa fecha
+    const ventasDelDia = ventasConId.filter(v => v.fecha === fechaCerrar);
+    const totalDelDia = ventasDelDia.reduce((sum, v) => sum + (v.monto || 0), 0);
+    
+    const confirmar = confirm(
+        `⚠️ ¿Cerrar el día?\n\n📅 Fecha a cerrar: ${fechaCerrar}\n💰 Total del día: S/ ${totalDelDia}\n🧾 Ventas del día: ${ventasDelDia.length}\n\n📌 Ventas totales: ${ventasConId.length}\n📅 Fechas disponibles: ${fechasUnicas.join(", ")}\n\n¿Guardar este cierre y eliminar las ventas de ${fechaCerrar}?`
+    );
     if (!confirmar) return;
     
-    const hoy = new Date();
-    const dia = String(hoy.getDate()).padStart(2, '0');
-    const mes = String(hoy.getMonth() + 1).padStart(2, '0');
-    const año = hoy.getFullYear();
-    const fechaHoy = `${dia}/${mes}/${año}`;
-    
-    const totalVentas = ventasConId.length;
-    const montoTotal = calcularTotal();
-    
+    // 1. Guardar el cierre en Firebase
     const cierre = {
-        fecha: fechaHoy,
-        totalVentas: totalVentas,
-        montoTotal: montoTotal,
+        fecha: fechaCerrar,
+        totalVentas: ventasDelDia.length,
+        montoTotal: totalDelDia,
         timestamp: Date.now()
     };
     
     try {
         await window.addDoc(window.collection(window.db, "cierres"), cierre);
         
+        // 2. Eliminar las ventas de esa fecha
         const snapshot = await window.getDocs(window.collection(window.db, "ventas"));
         let eliminadas = 0;
-        let noEliminadas = 0;
-        let fechasNoEliminadas = [];
         
         for (const docSnap of snapshot.docs) {
             const data = docSnap.data();
-            const fechaVenta = data.fecha || "sin fecha";
-            
-            if (fechaVenta === fechaHoy) {
+            if (data.fecha === fechaCerrar) {
                 await window.deleteDoc(window.doc(window.db, "ventas", docSnap.id));
                 eliminadas++;
-            } else {
-                noEliminadas++;
-                if (!fechasNoEliminadas.includes(fechaVenta)) {
-                    fechasNoEliminadas.push(fechaVenta);
-                }
             }
         }
         
-        let mensaje = `✅ Día cerrado.\n💰 Total: S/ ${montoTotal}\n🧾 Ventas: ${totalVentas}\n🗑️ Eliminadas: ${eliminadas}`;
-        if (noEliminadas > 0) {
-            mensaje += `\n📌 Quedan ${noEliminadas} ventas de otras fechas: ${fechasNoEliminadas.join(", ")}`;
-        }
-        alert(mensaje);
-        
+        alert(`✅ Día ${fechaCerrar} cerrado correctamente.\n\n🗑️ Ventas eliminadas: ${eliminadas}\n💰 Total del día: S/ ${totalDelDia}`);
         location.reload();
         
     } catch (e) {
         console.error(e);
-        alert("Error al cerrar el día: " + e.message);
+        alert("❌ Error al cerrar el día: " + e.message);
     }
 }
 
