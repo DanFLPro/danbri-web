@@ -280,8 +280,11 @@ async function iniciarFirebase() {
 // ==================== FUNCIONES PRINCIPALES ====================
 function obtenerFechaHora() {
     let ahora = new Date();
+    const dia = String(ahora.getDate()).padStart(2, '0');
+    const mes = String(ahora.getMonth() + 1).padStart(2, '0');
+    const año = ahora.getFullYear();
     return {
-        fecha: ahora.toLocaleDateString("es-PE"),
+        fecha: `${dia}/${mes}/${año}`,
         hora: ahora.toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" }),
         timestamp: Date.now()
     };
@@ -471,12 +474,17 @@ async function cerrarDia() {
     const confirmar = confirm("⚠️ ¿Cerrar el día? Se guardará el resumen y se eliminarán las ventas del día.");
     if (!confirmar) return;
     
-    const hoy = new Date().toLocaleDateString("es-PE");
+    const hoy = new Date();
+    const dia = String(hoy.getDate()).padStart(2, '0');
+    const mes = String(hoy.getMonth() + 1).padStart(2, '0');
+    const año = hoy.getFullYear();
+    const fechaHoy = `${dia}/${mes}/${año}`;
+    
     const totalVentas = ventasConId.length;
     const montoTotal = calcularTotal();
     
     const cierre = {
-        fecha: hoy,
+        fecha: fechaHoy,
         totalVentas: totalVentas,
         montoTotal: montoTotal,
         timestamp: Date.now()
@@ -487,13 +495,16 @@ async function cerrarDia() {
         alert(`✅ Día cerrado. Total: S/ ${montoTotal} (${totalVentas} ventas)`);
         
         const snapshot = await window.getDocs(window.collection(window.db, "ventas"));
+        let eliminadas = 0;
         for (const docSnap of snapshot.docs) {
             const data = docSnap.data();
-            if (data.fecha === hoy) {
+            if (data.fecha === fechaHoy) {
                 await window.deleteDoc(window.doc(window.db, "ventas", docSnap.id));
+                eliminadas++;
             }
         }
         
+        alert(`✅ Se eliminaron ${eliminadas} ventas del día ${fechaHoy}`);
         location.reload();
         
     } catch (e) {
