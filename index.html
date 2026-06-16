@@ -459,7 +459,7 @@ async function eliminarVenta(id) {
     }
 }
 
-// ==================== CERRAR DÍA ====================
+// ==================== CERRAR DÍA CORREGIDO ====================
 async function cerrarDia() {
     if (rolActual !== "admin") {
         alert("Solo el administrador puede cerrar el día.");
@@ -471,7 +471,10 @@ async function cerrarDia() {
         return;
     }
     
-    const confirmar = confirm("⚠️ ¿Cerrar el día? Se guardará el resumen y se eliminarán las ventas del día.");
+    // 🔍 DIAGNÓSTICO: Mostrar las fechas
+    let fechasVentas = ventasConId.map(v => v.fecha || "sin fecha").join(", ");
+    
+    const confirmar = confirm(`⚠️ ¿Cerrar el día?\n\n📅 Fechas de ventas encontradas:\n${fechasVentas}\n\nSe guardará el resumen y se eliminarán las ventas del día de HOY.`);
     if (!confirmar) return;
     
     const hoy = new Date();
@@ -492,19 +495,33 @@ async function cerrarDia() {
     
     try {
         await window.addDoc(window.collection(window.db, "cierres"), cierre);
-        alert(`✅ Día cerrado. Total: S/ ${montoTotal} (${totalVentas} ventas)`);
         
         const snapshot = await window.getDocs(window.collection(window.db, "ventas"));
         let eliminadas = 0;
+        let noEliminadas = 0;
+        let fechasNoEliminadas = [];
+        
         for (const docSnap of snapshot.docs) {
             const data = docSnap.data();
-            if (data.fecha === fechaHoy) {
+            const fechaVenta = data.fecha || "sin fecha";
+            
+            if (fechaVenta === fechaHoy) {
                 await window.deleteDoc(window.doc(window.db, "ventas", docSnap.id));
                 eliminadas++;
+            } else {
+                noEliminadas++;
+                if (!fechasNoEliminadas.includes(fechaVenta)) {
+                    fechasNoEliminadas.push(fechaVenta);
+                }
             }
         }
         
-        alert(`✅ Se eliminaron ${eliminadas} ventas del día ${fechaHoy}`);
+        let mensaje = `✅ Día cerrado.\n💰 Total: S/ ${montoTotal}\n🧾 Ventas: ${totalVentas}\n🗑️ Eliminadas: ${eliminadas}`;
+        if (noEliminadas > 0) {
+            mensaje += `\n📌 Quedan ${noEliminadas} ventas de otras fechas: ${fechasNoEliminadas.join(", ")}`;
+        }
+        alert(mensaje);
+        
         location.reload();
         
     } catch (e) {
