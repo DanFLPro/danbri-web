@@ -48,6 +48,16 @@ button {
     color: white;
 }
 
+.cerrar-dia {
+    background: #4CAF50;
+    color: white;
+}
+
+.historial {
+    background: #2196F3;
+    color: white;
+}
+
 h2 {
     font-size: 32px;
     margin-top: 20px;
@@ -108,6 +118,62 @@ img {
     align-items: center;
     gap: 10px;
 }
+
+/* Modal de historial */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.8);
+    overflow-y: auto;
+}
+
+.modal-content {
+    background: #1a1a1a;
+    margin: 50px auto;
+    padding: 20px;
+    border-radius: 20px;
+    max-width: 600px;
+    width: 90%;
+    color: white;
+    position: relative;
+}
+
+.modal-content h2 {
+    color: orange;
+    margin-top: 0;
+}
+
+.close-modal {
+    position: absolute;
+    top: 15px;
+    right: 20px;
+    font-size: 30px;
+    cursor: pointer;
+    color: #888;
+}
+
+.close-modal:hover {
+    color: white;
+}
+
+.cierre-item {
+    background: #222;
+    padding: 12px;
+    margin: 10px 0;
+    border-radius: 8px;
+    text-align: left;
+    border-left: 4px solid #4CAF50;
+}
+
+.cierre-item span {
+    color: orange;
+    font-weight: bold;
+}
 </style>
 </head>
 
@@ -140,7 +206,9 @@ img {
         <button onclick="registrarVenta()">Registrar Venta</button>
         
         <div id="adminButtons" style="display:none;">
-            <button class="reset" onclick="reiniciarFirebase()">Reiniciar TODAS las ventas</button>
+            <button class="cerrar-dia" onclick="cerrarDia()">📆 Cerrar día</button>
+            <button class="historial" onclick="abrirHistorial()">📊 Historial de cierres</button>
+            <button class="reset" onclick="reiniciarFirebase()">⚠️ Reiniciar TODAS las ventas</button>
         </div>
     </div>
 
@@ -148,6 +216,18 @@ img {
     <h2>Ventas realizadas: <span id="contador">0</span></h2>
 
     <div id="listaVentas"></div>
+</div>
+
+<!-- Modal de Historial -->
+<div id="historialModal" class="modal">
+    <div class="modal-content">
+        <span class="close-modal" onclick="cerrarHistorial()">&times;</span>
+        <h2>📊 Historial de cierres</h2>
+        <div id="listaCierres">
+            <p style="color:#888;">Cargando historial...</p>
+        </div>
+        <button onclick="cerrarHistorial()" style="background:#555; width:auto; padding:10px 30px;">Cerrar</button>
+    </div>
 </div>
 
 <script>
@@ -258,8 +338,6 @@ function cargarVentas() {
         unsubscribeVentas();
     }
     
-    // Usar una consulta simple (sin where por ahora para evitar índices)
-    // Filtramos manualmente en el frontend según el rol
     const q = window.query(window.collection(window.db, "ventas"), window.orderBy("timestamp", "desc"));
     
     unsubscribeVentas = window.onSnapshot(q, (snapshot) => {
@@ -268,7 +346,6 @@ function cargarVentas() {
         
         snapshot.forEach(docSnap => {
             const data = docSnap.data();
-            // Filtrar según el rol
             if (rolActual === "admin") {
                 datos.push(data);
                 datosConId.push({ id: docSnap.id, ...data });
@@ -326,7 +403,6 @@ async function registrarVenta() {
 }
 
 async function editarVenta(id, montoActual, descripcionActual) {
-    // Verificar que la venta pertenezca al vendedor actual (solo por seguridad)
     const venta = ventasConId.find(v => v.id === id);
     if (rolActual !== "admin" && (!venta || venta.vendedor !== usuarioActual)) {
         alert("No puedes editar esta venta");
@@ -362,7 +438,6 @@ async function editarVenta(id, montoActual, descripcionActual) {
 }
 
 async function eliminarVenta(id) {
-    // Verificar que la venta pertenezca al vendedor actual
     const venta = ventasConId.find(v => v.id === id);
     if (rolActual !== "admin" && (!venta || venta.vendedor !== usuarioActual)) {
         alert("No puedes eliminar esta venta");
@@ -381,6 +456,114 @@ async function eliminarVenta(id) {
     }
 }
 
+// ==================== CERRAR DÍA ====================
+async function cerrarDia() {
+    if (rolActual !== "admin") {
+        alert("Solo el administrador puede cerrar el día.");
+        return;
+    }
+    
+    if (ventasConId.length === 0) {
+        alert("No hay ventas registradas para cerrar el día.");
+        return;
+    }
+    
+    const confirmar = confirm("⚠️ ¿Cerrar el día? Se guardará el resumen y se eliminarán las ventas del día.");
+    if (!confirmar) return;
+    
+    const hoy = new Date().toLocaleDateString("es-PE");
+    const totalVentas = ventasConId.length;
+    const montoTotal = calcularTotal();
+    
+    const cierre = {
+        fecha: hoy,
+        totalVentas: totalVentas,
+        montoTotal: montoTotal,
+        timestamp: Date.now()
+    };
+    
+    try {
+        await window.addDoc(window.collection(window.db, "cierres"), cierre);
+        alert(`✅ Día cerrado. Total: S/ ${montoTotal} (${totalVentas} ventas)`);
+        
+        const snapshot = await window.getDocs(window.collection(window.db, "ventas"));
+        for (const docSnap of snapshot.docs) {
+            const data = docSnap.data();
+            if (data.fecha === hoy) {
+                await window.deleteDoc(window.doc(window.db, "ventas", docSnap.id));
+            }
+        }
+        
+        location.reload();
+        
+    } catch (e) {
+        console.error(e);
+        alert("Error al cerrar el día: " + e.message);
+    }
+}
+
+// ==================== HISTORIAL DE CIERRES ====================
+async function abrirHistorial() {
+    if (rolActual !== "admin") {
+        alert("Solo el administrador puede ver el historial.");
+        return;
+    }
+    
+    const modal = document.getElementById("historialModal");
+    const lista = document.getElementById("listaCierres");
+    modal.style.display = "block";
+    lista.innerHTML = '<p style="color:#888;">Cargando historial...</p>';
+    
+    try {
+        const snapshot = await window.getDocs(
+            window.query(window.collection(window.db, "cierres"), window.orderBy("timestamp", "desc"))
+        );
+        
+        if (snapshot.empty) {
+            lista.innerHTML = '<p style="color:#888;">No hay cierres registrados aún.</p>';
+            return;
+        }
+        
+        let html = '';
+        let totalGeneral = 0;
+        let totalVentasGeneral = 0;
+        
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            totalGeneral += data.montoTotal || 0;
+            totalVentasGeneral += data.totalVentas || 0;
+            
+            html += `
+                <div class="cierre-item">
+                    📅 <strong>${data.fecha}</strong><br>
+                    💰 Total: <span>S/ ${data.montoTotal || 0}</span><br>
+                    🧾 Ventas: ${data.totalVentas || 0}
+                </div>
+            `;
+        });
+        
+        html = `
+            <div style="background:#1a3a1a; padding:15px; border-radius:8px; margin-bottom:20px; text-align:center;">
+                <strong>📊 RESUMEN GENERAL</strong><br>
+                💰 Total acumulado: <span style="color:orange; font-size:24px;">S/ ${totalGeneral}</span><br>
+                🧾 Ventas totales: ${totalVentasGeneral}
+            </div>
+            ${html}
+        `;
+        
+        lista.innerHTML = html;
+        
+    } catch (e) {
+        console.error(e);
+        lista.innerHTML = '<p style="color:red;">Error al cargar el historial</p>';
+    }
+}
+
+function cerrarHistorial() {
+    document.getElementById("historialModal").style.display = "none";
+}
+
+// ==================== REINICIAR FIREBASE ====================
 async function reiniciarFirebase() {
     if (rolActual !== "admin") {
         alert("Solo el administrador puede reiniciar todas las ventas.");
@@ -396,6 +579,7 @@ async function reiniciarFirebase() {
             await window.deleteDoc(window.doc(window.db, "ventas", docSnap.id));
         }
         alert("✅ Todas las ventas han sido eliminadas");
+        location.reload();
     } catch (e) {
         console.error(e);
         alert("Error al reiniciar: " + e.message);
@@ -479,11 +663,13 @@ async function iniciarSesion() {
         iniciarSesionGlobal(sesion.usuario, sesion.data.rol, sesion.data.nombre);
     }
     
-    // Exponer funciones globalmente
     window.registrarVenta = registrarVenta;
     window.editarVenta = editarVenta;
     window.eliminarVenta = eliminarVenta;
     window.reiniciarFirebase = reiniciarFirebase;
+    window.cerrarDia = cerrarDia;
+    window.abrirHistorial = abrirHistorial;
+    window.cerrarHistorial = cerrarHistorial;
     window.iniciarSesion = iniciarSesion;
     window.cerrarSesion = cerrarSesion;
 })();
